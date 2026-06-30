@@ -15,7 +15,7 @@ module.exports = async (req, res) => {
         'X-Title': 'Simulador Entrevista Farmacia'
       },
       body: JSON.stringify({
-        model: 'mistralai/mistral-7b-instruct:free',
+        model: 'google/gemma-3-4b-it:free',
         messages: [
           { role: 'system', content: system },
           ...messages
