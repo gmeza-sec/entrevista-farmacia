@@ -24,7 +24,8 @@ module.exports = async (req, res) => {
     });
 
     const data = await response.json();
-    const text = data.choices?.[0]?.message?.content || 'Sin respuesta';
+    console.log('OpenRouter response:', JSON.stringify(data));
+const text = data.choices?.[0]?.message?.content || 'Sin respuesta';
     res.status(200).json({ content: [{ text }] });
   } catch (error) {
     res.status(500).json({ error: error.message });
