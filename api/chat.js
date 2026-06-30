@@ -15,7 +15,8 @@ module.exports = async (req, res) => {
         'X-Title': 'Simulador Entrevista Farmacia'
       },
       body: JSON.stringify({
-        model: 'nvidia/llama-3.1-nemotron-ultra-253b-v1:free',
+        model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+        stream: false,
         messages: [
           { role: 'system', content: system },
           ...messages
@@ -25,7 +26,7 @@ module.exports = async (req, res) => {
 
     const data = await response.json();
     console.log('OpenRouter response:', JSON.stringify(data));
-const text = data.choices?.[0]?.message?.content || 'Sin respuesta';
+    const text = data.choices?.[0]?.message?.content || 'Sin respuesta';
     res.status(200).json({ content: [{ text }] });
   } catch (error) {
     res.status(500).json({ error: error.message });
