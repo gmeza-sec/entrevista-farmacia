@@ -11,7 +11,7 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'El historial de mensajes es requerido.' });
     }
 
-    // 1. Mapear el historial al formato JSON puro que exige la API oficial de Gemini
+    // 1. Formatear el historial al formato nativo de Gemini
     const contents = messages.map(msg => {
       const role = msg.role === 'assistant' || msg.role === 'model' ? 'model' : 'user';
       const textContent = msg.content || msg.text || '';
@@ -21,23 +21,26 @@ module.exports = async (req, res) => {
       };
     });
 
-    // 2. Construir el cuerpo de la petición incluyendo las instrucciones del sistema si existen
-    const requestBody = {
-      contents: contents
-    };
+    const requestBody = { contents };
 
+    // Agregar el prompt del sistema si el frontend lo envía
     if (system) {
       requestBody.systemInstruction = {
         parts: [{ text: system }]
       };
     }
 
+    // 2. Capturar la API Key desde el entorno de Vercel
     const apiKey = process.env.GEMINI_API_KEY;
-    
-    // 3. Llamar directamente al Endpoint oficial de Google mediante Fetch nativo
+
+    if (!apiKey) {
+      throw new Error('La variable GEMINI_API_KEY no está definida en Vercel.');
+    }
+
+    // 3. Realizar la petición HTTP usando fetch global de Node.js (v18+)
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
-    const googleResponse = await fetch(url, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -45,35 +48,35 @@ module.exports = async (req, res) => {
       body: JSON.stringify(requestBody)
     });
 
-    const data = await googleResponse.json();
+    const data = await response.json();
 
-    // 4. Validar la respuesta estructural de Google
-    let textoGenerado = "";
-    if (data && data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-      textoGenerado = data.candidates[0].content.parts[0].text;
-    } else {
-      // Si la API responde con un formato inesperado o error de cuota
-      console.error('Respuesta inesperada de Google:', JSON.stringify(data));
-      textoGenerado = "**FEEDBACK:** ¡Hola Gustavo! Qué gusto saludarte. Agradezco mucho que te presentes de inmediato en esta simulación.\n\n**SIGUIENTE PREGUNTA:** Para comenzar formalmente el proceso, cuéntame qué te motivó a postularte como Auxiliar de Farmacia y cómo crees que tu experiencia previa puede aportar al equipo.";
+    // Si Google nos devuelve un error de autenticación o cuota, lo capturamos aquí
+    if (data.error) {
+      throw new Error(`Google API Error [${data.error.code}]: ${data.error.message}`);
     }
 
-    // 5. Devolver la respuesta estructurada tal como la lee tu App.js en el frontend
-    return res.status(200).json({
-      content: [
-        { text: textoGenerado }
-      ]
-    });
+    // 4. Extraer el texto original e inteligente generado por Gemini
+    if (data && data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+      const textoOriginalIA = data.candidates[0].content.parts[0].text;
+
+      return res.status(200).json({
+        content: [
+          { text: textoOriginalIA }
+        ]
+      });
+    }
+
+    throw new Error('Estructura de respuesta desconocida de Google AI Studio.');
 
   } catch (error) {
-    console.error('Error en la Serverless Function:', error);
-    
-    // Rescate total para que la interfaz de React nunca se rompa ni quede colgada
-    return res.status(200).json({
-      content: [
-        { 
-          text: "**FEEDBACK:** ¡Hola Gustavo! Qué gusto saludarte. Agradezco tu presentación inicial y tu buena disposición para este proceso.\n\n**SIGUIENTE PREGUNTA:** Cuénteme, ¿cuál es su motivación principal para incorporarse al rubro farmacéutico y atender público en nuestra cadena?" 
-        }
-      ]
+    // Esto imprimirá el error exacto en tu consola de Vercel (imagen_7.png) para saber qué pasa
+    console.error('CRÍTICO:', error.message);
+
+    // Devolvemos un error 500 real para que el frontend sepa que la API de Google falló 
+    // y no te siga mostrando el bucle repetitivo de texto.
+    return res.status(500).json({ 
+      error: 'Error al generar respuesta original', 
+      details: error.message 
     });
   }
 };
