@@ -17,13 +17,14 @@ const handler = async (req, res) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          system_instruction: { parts: [{ text: system }] },
+          systemInstruction: { parts: [{ text: system }] },
           contents: geminiMessages
         })
       }
     );
 
     const data = await response.json();
+    console.log('Gemini response:', JSON.stringify(data));
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sin respuesta';
     res.status(200).json({ content: [{ text }] });
   } catch (error) {
