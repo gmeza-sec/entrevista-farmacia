@@ -1,4 +1,4 @@
-module.exports = async function handler(req, res) {
+const handler = async (req, res) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -29,6 +29,6 @@ module.exports = async function handler(req, res) {
   } catch (error) {
     res.status(500).json({ error: 'Error al conectar con Gemini' });
   }
-}
-  }
-}
+};
+
+module.exports = handler;
