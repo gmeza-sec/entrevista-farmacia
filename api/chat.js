@@ -32,8 +32,8 @@ module.exports = async (req, res) => {
 
     const apiKey = process.env.GEMINI_API_KEY;
 
-    // 2. Endpoint global v1 estable sin sub-versiones beta
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // 2. Usamos el endpoint v1beta que SI soporta systemInstruction
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
     const response = await fetch(url, {
       method: 'POST',
@@ -45,23 +45,22 @@ module.exports = async (req, res) => {
 
     const data = await response.json();
 
-    // 3. Si Google devuelve un mensaje de error, lo exponemos para solucionarlo de inmediato
+    // 3. Si Google devuelve un mensaje de error, lo exponemos
     if (data.error) {
       return res.status(200).json({
         content: [{ text: `**ERROR DE GOOGLE (${data.error.code}):** ${data.error.message}` }]
       });
     }
 
-    // 4. Retornar la respuesta original de la IA
+    // 4. Retornar la respuesta original e inteligente de la IA
     if (data && data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
       return res.status(200).json({
         content: [{ text: data.candidates[0].content.parts[0].text }]
       });
     }
 
-    // Si la respuesta viene vacía por alguna otra razón
     return res.status(200).json({
-      content: [{ text: "**SISTEMA:** La API conectó, pero no devolvió texto. Revisa la consola." }]
+      content: [{ text: "**SISTEMA:** La API conectó, pero no devolvió texto." }]
     });
 
   } catch (error) {
