@@ -1,5 +1,4 @@
 module.exports = async (req, res) => {
-  // Asegurar que solo se procesen peticiones POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
@@ -11,7 +10,7 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'El historial de mensajes es requerido.' });
     }
 
-    // 1. Formatear el historial al formato nativo de Gemini
+    // 1. Mapear el historial asegurando que el contenido sea texto limpio
     const contents = messages.map(msg => {
       const role = msg.role === 'assistant' || msg.role === 'model' ? 'model' : 'user';
       const textContent = msg.content || msg.text || '';
@@ -21,28 +20,24 @@ module.exports = async (req, res) => {
       };
     });
 
-    const requestBody = { contents };
+    const requestBody = { 
+      contents: contents 
+    };
 
-    // Agregar el prompt del sistema si el frontend lo envía
     if (system) {
       requestBody.systemInstruction = {
         parts: [{ text: system }]
       };
     }
 
-    // 2. Capturar la API Key desde el entorno de Vercel
     const apiKey = process.env.GEMINI_API_KEY;
 
-    if (!apiKey) {
-      throw new Error('La variable GEMINI_API_KEY no está definida en Vercel.');
-    }
-
-    // 3. Realizar la petición HTTP usando fetch global de Node.js (v18+)
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // 2. Endpoint global v1 estable sin sub-versiones beta
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
+      headers: { 
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(requestBody)
@@ -50,33 +45,29 @@ module.exports = async (req, res) => {
 
     const data = await response.json();
 
-    // Si Google nos devuelve un error de autenticación o cuota, lo capturamos aquí
+    // 3. Si Google devuelve un mensaje de error, lo exponemos para solucionarlo de inmediato
     if (data.error) {
-      throw new Error(`Google API Error [${data.error.code}]: ${data.error.message}`);
-    }
-
-    // 4. Extraer el texto original e inteligente generado por Gemini
-    if (data && data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-      const textoOriginalIA = data.candidates[0].content.parts[0].text;
-
       return res.status(200).json({
-        content: [
-          { text: textoOriginalIA }
-        ]
+        content: [{ text: `**ERROR DE GOOGLE (${data.error.code}):** ${data.error.message}` }]
       });
     }
 
-    throw new Error('Estructura de respuesta desconocida de Google AI Studio.');
+    // 4. Retornar la respuesta original de la IA
+    if (data && data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+      return res.status(200).json({
+        content: [{ text: data.candidates[0].content.parts[0].text }]
+      });
+    }
+
+    // Si la respuesta viene vacía por alguna otra razón
+    return res.status(200).json({
+      content: [{ text: "**SISTEMA:** La API conectó, pero no devolvió texto. Revisa la consola." }]
+    });
 
   } catch (error) {
-    // Esto imprimirá el error exacto en tu consola de Vercel (imagen_7.png) para saber qué pasa
-    console.error('CRÍTICO:', error.message);
-
-    // Devolvemos un error 500 real para que el frontend sepa que la API de Google falló 
-    // y no te siga mostrando el bucle repetitivo de texto.
-    return res.status(500).json({ 
-      error: 'Error al generar respuesta original', 
-      details: error.message 
+    console.error('Error crítico:', error);
+    return res.status(200).json({
+      content: [{ text: `**ERROR CRÍTICO INTERNO:** ${error.message}` }]
     });
   }
 };
