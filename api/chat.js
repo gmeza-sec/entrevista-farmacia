@@ -6,67 +6,27 @@ module.exports = async (req, res) => {
   try {
     const { messages, system } = req.body;
 
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return res.status(400).json({ error: 'El historial de mensajes es requerido.' });
-    }
-
-    // 1. Mapear el historial asegurando que el contenido sea texto limpio
-    const contents = messages.map(msg => {
-      const role = msg.role === 'assistant' || msg.role === 'model' ? 'model' : 'user';
-      const textContent = msg.content || msg.text || '';
-      return {
-        role: role,
-        parts: [{ text: textContent }]
-      };
-    });
-
-    const requestBody = { 
-      contents: contents 
-    };
-
-    if (system) {
-      requestBody.systemInstruction = {
-        parts: [{ text: system }]
-      };
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    // 2. Usamos el endpoint v1beta que SI soporta systemInstruction
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`;
-    
-    const response = await fetch(url, {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json'
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'HTTP-Referer': 'https://entrevista-farmacia.vercel.app',
+        'X-Title': 'Simulador Entrevista Farmacia'
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify({
+        model: 'meta-llama/llama-3.1-8b-instruct:free',
+        messages: [
+          { role: 'system', content: system },
+          ...messages
+        ]
+      })
     });
 
     const data = await response.json();
-
-    // 3. Si Google devuelve un mensaje de error, lo exponemos
-    if (data.error) {
-      return res.status(200).json({
-        content: [{ text: `**ERROR DE GOOGLE (${data.error.code}):** ${data.error.message}` }]
-      });
-    }
-
-    // 4. Retornar la respuesta original e inteligente de la IA
-    if (data && data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-      return res.status(200).json({
-        content: [{ text: data.candidates[0].content.parts[0].text }]
-      });
-    }
-
-    return res.status(200).json({
-      content: [{ text: "**SISTEMA:** La API conectó, pero no devolvió texto." }]
-    });
-
+    const text = data.choices?.[0]?.message?.content || 'Sin respuesta';
+    res.status(200).json({ content: [{ text }] });
   } catch (error) {
-    console.error('Error crítico:', error);
-    return res.status(200).json({
-      content: [{ text: `**ERROR CRÍTICO INTERNO:** ${error.message}` }]
-    });
+    res.status(500).json({ error: error.message });
   }
 };
