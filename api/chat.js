@@ -12,32 +12,39 @@ module.exports = async (req, res) => {
   try {
     const { messages, system } = req.body;
 
-    if (!messages || !Array.isArray(messages)) {
-      return res.status(400).json({ error: 'Missing or invalid "messages" array.' });
+    // Validación exhaustiva del historial recibido
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'El historial de mensajes está vacío o es inválido.' });
     }
 
-    // 1. Formatear el historial de mensajes al formato que espera Gemini (role: 'user' o 'model')
-    // Vercel Serverless maneja la última interacción de forma integrada en el historial,
-    // o puedes pasar el array completo si ya viene estructurado.
-    const contents = messages.map(msg => ({
-      role: msg.role === 'assistant' ? 'model' : msg.role,
-      parts: [{ text: msg.content || msg.text }]
-    }));
+    // Mapeo ultra-seguro para Gemini (evita campos vacíos o errores de rol)
+    const contents = messages.map(msg => {
+      // Forzar que el rol sea 'user' o 'model' (Gemini usa 'model' en vez de 'assistant')
+      const role = msg.role === 'assistant' || msg.role === 'model' ? 'model' : 'user';
+      
+      // Capturar el texto sin importar si el frontend lo envió como .content o .text
+      const textContent = msg.content || msg.text || '';
 
-    // 2. Configurar las opciones, incluyendo las instrucciones del sistema si vienen en la petición
+      return {
+        role: role,
+        parts: [{ text: textContent }]
+      };
+    });
+
+    // Configurar las opciones, incluyendo las instrucciones del sistema si vienen en la petición
     const config = {};
     if (system) {
       config.systemInstruction = system;
     }
 
-    // 3. Llamar a la API usando Gemini 1.5 Flash
+    // Llamar a la API usando Gemini 1.5 Flash
     const response = await ai.models.generateContent({
       model: 'gemini-1.5-flash',
       contents: contents,
       config: config
     });
 
-    // 4. Estructurar la respuesta según tu requerimiento exacto
+    // Estructurar la respuesta según tu requerimiento exacto
     return res.status(200).json({
       content: [
         { text: response.text }
