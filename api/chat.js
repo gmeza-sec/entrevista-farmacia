@@ -15,7 +15,7 @@ module.exports = async (req, res) => {
         'X-Title': 'Simulador Entrevista Farmacia'
       },
       body: JSON.stringify({
-        model: 'google/gemma-3-4b-it:free',
+        model: 'nvidia/llama-3.1-nemotron-ultra-253b-v1:free',
         messages: [
           { role: 'system', content: system },
           ...messages
